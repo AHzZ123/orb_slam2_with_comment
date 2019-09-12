@@ -29,7 +29,7 @@ namespace ORB_SLAM2
 long unsigned int Frame::nNextId=0;
 bool Frame::mbInitialComputations=true;
 float Frame::cx, Frame::cy, Frame::fx, Frame::fy, Frame::invfx, Frame::invfy;
-float Frame::mnMinX, Frame::mnMinY, Frame::mnMaxX, Frame::mnMaxY;
+float Frame::mnMinX, Frame::mnMinY, Frame::mnMaxX, Frame::mnMaxY;   // 图像边界
 float Frame::mfGridElementWidthInv, Frame::mfGridElementHeightInv;
 
 Frame::Frame()
@@ -326,11 +326,21 @@ bool Frame::isInFrustum(MapPoint *pMP, float viewingCosLimit)
     return true;
 }
 
+/**
+* 找到在 以x, y为中心,边长为2r的方形搜索框内且在[minLevel, maxLevel]的特征点
+* @param x        图像坐标u
+* @param y        图像坐标v
+* @param r        边长
+* @param minLevel 最小尺度
+* @param maxLevel 最大尺度
+* @return         满足条件的特征点的序号
+*/
 vector<size_t> Frame::GetFeaturesInArea(const float &x, const float  &y, const float  &r, const int minLevel, const int maxLevel) const
 {
     vector<size_t> vIndices;
     vIndices.reserve(N);
-
+    // 计算方形的四边在哪在mGrid中的行数和列数
+    // nMinCellX是方形左边在mGrid中的列数，如果它比mGrid的列数大，说明方形内肯定没有特征点，于是返回
     const int nMinCellX = max(0,(int)floor((x-mnMinX-r)*mfGridElementWidthInv));
     if(nMinCellX>=FRAME_GRID_COLS)
         return vIndices;
@@ -348,7 +358,7 @@ vector<size_t> Frame::GetFeaturesInArea(const float &x, const float  &y, const f
         return vIndices;
 
     const bool bCheckLevels = (minLevel>0) || (maxLevel>=0);
-
+     
     for(int ix = nMinCellX; ix<=nMaxCellX; ix++)
     {
         for(int iy = nMinCellY; iy<=nMaxCellY; iy++)

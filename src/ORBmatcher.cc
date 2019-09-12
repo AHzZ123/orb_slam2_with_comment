@@ -409,7 +409,7 @@ int ORBmatcher::SearchByProjection(KeyFrame* pKF, cv::Mat Scw, const vector<MapP
   * 如果匹配误差小于TH_LOW即匹配成功，更新vpMatched \n
   * @param  F1                Frame         普通帧
   * @param  F2		          Frame         普通帧
-  * @param  vbPrevMatched     先前帧F1已经有的匹配
+  * @param  vbPrevMatched     帧1特征点所在位置
   * @param  vpMatches12       帧1特征点在帧2中的匹配点
   * @param  windowSize        在帧2上搜索区域框大小  
   * @return                   成功匹配的数量
@@ -417,23 +417,27 @@ int ORBmatcher::SearchByProjection(KeyFrame* pKF, cv::Mat Scw, const vector<MapP
 int ORBmatcher::SearchForInitialization(Frame &F1, Frame &F2, vector<cv::Point2f> &vbPrevMatched, vector<int> &vnMatches12, int windowSize)
 {
     int nmatches=0;
+    // 初始化帧1特征点在帧2中的匹配点
     vnMatches12 = vector<int>(F1.mvKeysUn.size(),-1);
-
+    // 角度直方图
     vector<int> rotHist[HISTO_LENGTH];
     for(int i=0;i<HISTO_LENGTH;i++)
+        // 直方图的每个柱记录点数大小
         rotHist[i].reserve(500);
     const float factor = 1.0f/HISTO_LENGTH;
-
+    // 帧2匹配点对距离
     vector<int> vMatchedDistance(F2.mvKeysUn.size(),INT_MAX);
+    // 初始化帧2在帧1的匹配点
     vector<int> vnMatches21(F2.mvKeysUn.size(),-1);
-
+    // 为帧1的每个关键点在帧2中寻找匹配点
     for(size_t i1=0, iend1=F1.mvKeysUn.size(); i1<iend1; i1++)
     {
         cv::KeyPoint kp1 = F1.mvKeysUn[i1];
-        int level1 = kp1.octave;
+        // octave (pyramid layer) from which the keypoint has been extracted
+        int level1 = kp1.octave;    
         if(level1>0)
             continue;
-
+        // 在窗口内搜索匹配点集合
         vector<size_t> vIndices2 = F2.GetFeaturesInArea(vbPrevMatched[i1].x,vbPrevMatched[i1].y, windowSize,level1,level1);
 
         if(vIndices2.empty())

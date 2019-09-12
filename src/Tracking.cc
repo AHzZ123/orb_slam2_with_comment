@@ -581,7 +581,7 @@ void Tracking::MonocularInitialization()
         {
             mInitialFrame = Frame(mCurrentFrame);
             mLastFrame = Frame(mCurrentFrame);
-            // 拷贝第一帧中所有特征点
+            // 拷贝第一帧中所有特征点的位置
             mvbPrevMatched.resize(mCurrentFrame.mvKeysUn.size());  
             for(size_t i=0; i<mCurrentFrame.mvKeysUn.size(); i++)
                 mvbPrevMatched[i]=mCurrentFrame.mvKeysUn[i].pt;
@@ -611,6 +611,10 @@ void Tracking::MonocularInitialization()
 
         // Find correspondences
         ORBmatcher matcher(0.9,true);
+        // 单目初始化时的匹配
+        // mInitialFrame第一帧mCurrentFrame当前帧第二帧 
+        // mvbPreMatched是第一帧中的所有特征点；
+        // mvIniMatches标记匹配状态，未匹配上的标为-1；
         int nmatches = matcher.SearchForInitialization(mInitialFrame,mCurrentFrame,mvbPrevMatched,mvIniMatches,100);
 
         // Check if there are enough correspondences
