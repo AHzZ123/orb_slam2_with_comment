@@ -2,6 +2,7 @@
     "files.associations": {
         "thread": "cpp",
         "cmath": "cpp",
-        "*.tcc": "cpp"
+        "*.tcc": "cpp",
+        "mutex": "cpp"
     }
 }

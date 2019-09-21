@@ -163,37 +163,45 @@ cv::Mat PnPsolver::find(vector<bool> &vbInliers, int &nInliers)
 }
 
 cv::Mat PnPsolver::iterate(int nIterations, bool &bNoMore, vector<bool> &vbInliers, int &nInliers)
-{
+{ 
+    // 标志RANSAC迭代次数达到最大
     bNoMore = false;
     vbInliers.clear();
     nInliers=0;
 
+    // mRansacMinSet为每次RANSAC需要的特征点数，默认为4组3D-2D对应点
     set_maximum_number_of_correspondences(mRansacMinSet);
 
+    // N为所有2D点的个数, mRansacMinInliers为RANSAC迭代过程中最少的inlier数
     if(N<mRansacMinInliers)
     {
         bNoMore = true;
         return cv::Mat();
     }
 
+    // mvAllIndices为所有参与PnP的2D点的索引
+    // vAvailableIndices为每次从mvAllIndices中随机挑选mRansacMinSet组3D-2D对应点进行一次RANSAC
     vector<size_t> vAvailableIndices;
 
     int nCurrentIterations = 0;
+    //nCurrentIterations<nIterations计算nIterations次，或者当mnIterations<mRansacMaxIts中断
+    //一次while循环表示计算了一次epnp获得位姿
     while(mnIterations<mRansacMaxIts || nCurrentIterations<nIterations)
     {
-        nCurrentIterations++;
-        mnIterations++;
+        nCurrentIterations++; // 这个函数中迭代的次数
+        mnIterations++;       // 总的迭代次数，默认为最大为300
         reset_correspondences();
 
         vAvailableIndices = mvAllIndices;
 
         // Get min set of points
+	      // 生成RANSAC所需的随机序列
         for(short i = 0; i < mRansacMinSet; ++i)
         {
             int randi = DUtils::Random::RandomInt(0, vAvailableIndices.size()-1);
 
             int idx = vAvailableIndices[randi];
-
+            // 将对应的3D-2D压入到pws和us
             add_correspondence(mvP3Dw[idx].x,mvP3Dw[idx].y,mvP3Dw[idx].z,mvP2D[idx].x,mvP2D[idx].y);
 
             vAvailableIndices[randi] = vAvailableIndices.back();
@@ -201,14 +209,18 @@ cv::Mat PnPsolver::iterate(int nIterations, bool &bNoMore, vector<bool> &vbInlie
         }
 
         // Compute camera pose
+        // 通过epnp计算相机位姿
         compute_pose(mRi, mti);
 
         // Check inliers
+        //对于此次RANSAC计算的epnp求得的位姿，原先F中的特征点与mappoint的匹配还有哪些成立
         CheckInliers();
 
+        //如果此次求得的位姿所对应的内点超过阈值
         if(mnInliersi>=mRansacMinInliers)
         {
             // If it is the best solution so far, save it
+            //这是目前最好的结果，更新mnBestInliers，mnBestInliers ,mBestTcw
             if(mnInliersi>mnBestInliers)
             {
                 mvbBestInliers = mvbInliersi;
@@ -222,7 +234,8 @@ cv::Mat PnPsolver::iterate(int nIterations, bool &bNoMore, vector<bool> &vbInlie
                 Rcw.copyTo(mBestTcw.rowRange(0,3).colRange(0,3));
                 tcw.copyTo(mBestTcw.rowRange(0,3).col(3));
             }
-
+            //在Refine()中以mvbBestInliers中的点对通过epnp计算位姿而不是先前使用4个点对计算位姿
+            //如果计算的结果对应的inliner超过阈值mRansacMinInliers，则返回成功
             if(Refine())
             {
                 nInliers = mnRefinedInliers;

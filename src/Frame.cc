@@ -268,24 +268,32 @@ void Frame::UpdatePoseMatrices()
     mOw = -mRcw.t()*mtcw;
 }
 
+// 检查地图点 是否在 当前视野中
+// 相机坐标系下 点 深度小于0 点不在视野中
+// 像素坐标系下 点 横纵坐标在 校正后的图像尺寸内
 bool Frame::isInFrustum(MapPoint *pMP, float viewingCosLimit)
 {
+    // 初始设置为不再视野内
     pMP->mbTrackInView = false;
 
     // 3D in absolute coordinates
+    // 世界坐标系下的点
     cv::Mat P = pMP->GetWorldPos(); 
 
     // 3D in camera coordinates
+    // 相机坐标系下的点坐标
     const cv::Mat Pc = mRcw*P+mtcw;
     const float &PcX = Pc.at<float>(0);
     const float &PcY= Pc.at<float>(1);
     const float &PcZ = Pc.at<float>(2);
 
     // Check positive depth
+    // 深度为负，点不在视野内
     if(PcZ<0.0f)
         return false;
 
     // Project in image and check it is not outside
+    // 判断像素坐标系下的点是否在图像内
     const float invz = 1.0f/PcZ;
     const float u=fx*PcX*invz+cx;
     const float v=fy*PcY*invz+cy;
@@ -296,19 +304,22 @@ bool Frame::isInFrustum(MapPoint *pMP, float viewingCosLimit)
         return false;
 
     // Check distance is in the scale invariance region of the MapPoint
+    // 可视深度检测
     const float maxDistance = pMP->GetMaxDistanceInvariance();
     const float minDistance = pMP->GetMinDistanceInvariance();
+    // 相机光心到地图点的向量（和Pc有什么区别？？？）
     const cv::Mat PO = P-mOw;
     const float dist = cv::norm(PO);
 
     if(dist<minDistance || dist>maxDistance)
         return false;
 
-   // Check viewing angle
+    // Check viewing angle
+    // 检查观测角是否在阈值以内
     cv::Mat Pn = pMP->GetNormal();
-
+    // 观测角的cos值
     const float viewCos = PO.dot(Pn)/dist;
-
+    // 观测角度和平均观测角度的夹角过大，认为不在当前视野内
     if(viewCos<viewingCosLimit)
         return false;
 
@@ -316,9 +327,13 @@ bool Frame::isInFrustum(MapPoint *pMP, float viewingCosLimit)
     const int nPredictedLevel = pMP->PredictScale(dist,this);
 
     // Data used by the tracking
+    // 在视野中
     pMP->mbTrackInView = true;
+    // 投影点像素横坐标
     pMP->mTrackProjX = u;
+    // 匹配点像素横坐标 = 投影点像素横坐标 - 视差 = 投影点像素横坐标 - bf / 深度
     pMP->mTrackProjXR = u - mbf*invz;
+    // 投影点像素纵坐标
     pMP->mTrackProjY = v;
     pMP->mnTrackScaleLevel= nPredictedLevel;
     pMP->mTrackViewCos = viewCos;
@@ -340,6 +355,7 @@ vector<size_t> Frame::GetFeaturesInArea(const float &x, const float  &y, const f
     vector<size_t> vIndices;
     vIndices.reserve(N);
     // 计算方形的四边在哪在mGrid中的行数和列数
+    // mnMinX是校正后的图像边界
     // nMinCellX是方形左边在mGrid中的列数，如果它比mGrid的列数大，说明方形内肯定没有特征点，于是返回
     const int nMinCellX = max(0,(int)floor((x-mnMinX-r)*mfGridElementWidthInv));
     if(nMinCellX>=FRAME_GRID_COLS)
@@ -359,6 +375,7 @@ vector<size_t> Frame::GetFeaturesInArea(const float &x, const float  &y, const f
 
     const bool bCheckLevels = (minLevel>0) || (maxLevel>=0);
      
+    // 对待特征点周围的cell进行处理
     for(int ix = nMinCellX; ix<=nMaxCellX; ix++)
     {
         for(int iy = nMinCellY; iy<=nMaxCellY; iy++)
@@ -369,6 +386,7 @@ vector<size_t> Frame::GetFeaturesInArea(const float &x, const float  &y, const f
 
             for(size_t j=0, jend=vCell.size(); j<jend; j++)
             {
+                // 筛选Cell中的特征点，只取在一定距离内的
                 const cv::KeyPoint &kpUn = mvKeysUn[vCell[j]];
                 if(bCheckLevels)
                 {

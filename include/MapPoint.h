@@ -121,6 +121,7 @@ protected:
      std::map<KeyFrame*,size_t> mObservations;
 
      // Mean viewing direction
+     // 平均观测向量
      cv::Mat mNormalVector;
 
      // Best descriptor to fast matching
@@ -138,6 +139,9 @@ protected:
      MapPoint* mpReplaced;
 
      // Scale invariance distances
+     // 在UpdateNormalAndDepth中更新
+     // 地图点到参考帧（只有一帧）相机中心距离，乘上参考帧中描述子获取时金字塔放大尺度，
+     // 得到最大距离mfMaxDistance；最大距离除以整个金字塔最高层的放大尺度得到最小距离mfMinDistance。
      float mfMinDistance;
      float mfMaxDistance;
 

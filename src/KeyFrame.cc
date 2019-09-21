@@ -60,9 +60,11 @@ void KeyFrame::ComputeBoW()
 {
     if(mBowVec.empty() || mFeatVec.empty())
     {
+        // 将cv::Mat类型的特征点描述子转为描述子向量
         vector<cv::Mat> vCurrentDesc = Converter::toDescriptorVector(mDescriptors);
         // Feature vector associate features with nodes in the 4th level (from leaves up)
         // We assume the vocabulary tree has 6 levels, change the 4 otherwise
+        // 计算描述子的词袋和特征向量
         mpORBvocabulary->transform(vCurrentDesc,mBowVec,mFeatVec,4);
     }
 }
@@ -120,6 +122,10 @@ cv::Mat KeyFrame::GetTranslation()
     return Tcw.rowRange(0,3).col(3).clone();
 }
 
+/**在共视图Covisibility graph中添加边，并调用UpdateBestCovisibles()更新essential graph
+ * @param pKF 具有共视关系的其他关键帧
+ * @param weight 和pKF共视的mappoint数量
+ */
 void KeyFrame::AddConnection(KeyFrame *pKF, const int &weight)
 {
     {
@@ -288,8 +294,9 @@ MapPoint* KeyFrame::GetMapPoint(const size_t &idx)
 
 void KeyFrame::UpdateConnections()
 {
+    // 和此关键帧有共视关系的关键帧及其可以共视的mappoint数量
     map<KeyFrame*,int> KFcounter;
-
+    // 此关键帧可以看到的地图点
     vector<MapPoint*> vpMP;
 
     {
@@ -297,8 +304,10 @@ void KeyFrame::UpdateConnections()
         vpMP = mvpMapPoints;
     }
 
-    //For all map points in keyframe check in which other keyframes are they seen
+    //For all map points in keyframe, check in which other keyframes are they seen
     //Increase counter for those keyframes
+    // 对于此关键帧中的所有地图点，检查它们在那些关键帧可见
+    // 然后增加这些共视关键帧的计数器
     for(vector<MapPoint*>::iterator vit=vpMP.begin(), vend=vpMP.end(); vit!=vend; vit++)
     {
         MapPoint* pMP = *vit;
@@ -308,9 +317,9 @@ void KeyFrame::UpdateConnections()
 
         if(pMP->isBad())
             continue;
-
+        
         map<KeyFrame*,size_t> observations = pMP->GetObservations();
-
+        // 遍历看到此地图点的关键帧
         for(map<KeyFrame*,size_t>::iterator mit=observations.begin(), mend=observations.end(); mit!=mend; mit++)
         {
             if(mit->first->mnId==mnId)
@@ -325,12 +334,15 @@ void KeyFrame::UpdateConnections()
 
     //If the counter is greater than threshold add connection
     //In case no keyframe counter is over threshold add the one with maximum counter
+    // 记录和其他关键帧共视地图点数量最多的关键帧和数量    
     int nmax=0;
     KeyFrame* pKFmax=NULL;
+    // 加入共视边的阈值
     int th = 15;
 
     vector<pair<int,KeyFrame*> > vPairs;
     vPairs.reserve(KFcounter.size());
+    // 当共视mappoint点数量达到一定阈值th的情况下，则为邻边的记录中在covisibility graph添加一条边
     for(map<KeyFrame*,int>::iterator mit=KFcounter.begin(), mend=KFcounter.end(); mit!=mend; mit++)
     {
         if(mit->second>nmax)
@@ -344,13 +356,13 @@ void KeyFrame::UpdateConnections()
             (mit->first)->AddConnection(this,mit->second);
         }
     }
-
+    // 如果共视数量达不到th阈值，则把最大的pKFmax添加进去
     if(vPairs.empty())
     {
         vPairs.push_back(make_pair(nmax,pKFmax));
         pKFmax->AddConnection(this,nmax);
     }
-
+    // 根据共视图权重由小到大排序
     sort(vPairs.begin(),vPairs.end());
     list<KeyFrame*> lKFs;
     list<int> lWs;
@@ -359,7 +371,7 @@ void KeyFrame::UpdateConnections()
         lKFs.push_front(vPairs[i].second);
         lWs.push_front(vPairs[i].first);
     }
-
+    // 更新此帧的共视图
     {
         unique_lock<mutex> lockCon(mMutexConnections);
 
@@ -367,10 +379,12 @@ void KeyFrame::UpdateConnections()
         mConnectedKeyFrameWeights = KFcounter;
         mvpOrderedConnectedKeyFrames = vector<KeyFrame*>(lKFs.begin(),lKFs.end());
         mvOrderedWeights = vector<int>(lWs.begin(), lWs.end());
-
+        // 如果不是第一个关键帧，且此节点没有父节点（即第一次连接）
         if(mbFirstConnection && mnId!=0)
         {
+            // 共视程度最高的那个关键帧设置为此节点在Spanning Tree中的父节点
             mpParent = mvpOrderedConnectedKeyFrames.front();
+            // 共视程度最高的那个关键帧在Spanning Tree中的子节点设置为此关键帧
             mpParent->AddChild(this);
             mbFirstConnection = false;
         }

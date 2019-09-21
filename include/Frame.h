@@ -205,6 +205,7 @@ private:
     cv::Mat mRcw;
     cv::Mat mtcw;
     cv::Mat mRwc;
+    // 世界坐标系下的相机光心
     cv::Mat mOw; //==mtwc
 };
 

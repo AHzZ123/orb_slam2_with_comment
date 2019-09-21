@@ -168,6 +168,9 @@ public:
 
     //BoW
     DBoW2::BowVector mBowVec;
+    // 特征向量里面是个map ，map的第一个元素代表的是Node编号，第二个元素代表的是与第一个元素的NodeID对应的所有特征点的集合。意思就是，将特征点聚类起来了
+    // Feature vector associate features with nodes in the 4th level (from leaves up)
+    // We assume the vocabulary tree has 6 levels, change the 4 otherwise
     DBoW2::FeatureVector mFeatVec;
 
     // Pose relative to parent (this is computed when bad flag is activated)
@@ -200,6 +203,7 @@ protected:
     cv::Mat Cw; // Stereo middel point. Only for visualization
 
     // MapPoints associated to keypoints
+    // 大小是mvKeys大小，表示mappoint和此帧特征点的联系。如果没有联系则为NULL
     std::vector<MapPoint*> mvpMapPoints;
 
     // BoW
@@ -209,7 +213,9 @@ protected:
     // Grid over the image to speed up feature matching
     std::vector< std::vector <std::vector<size_t> > > mGrid;
 
+    // 此关键帧的共视帧及共视地图点数量
     std::map<KeyFrame*,int> mConnectedKeyFrameWeights;
+    // 排序后的共视帧及共视地图点数量
     std::vector<KeyFrame*> mvpOrderedConnectedKeyFrames;
     std::vector<int> mvOrderedWeights;
 

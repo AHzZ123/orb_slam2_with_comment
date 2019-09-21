@@ -230,21 +230,27 @@ cv::Mat System::TrackMonocular(const cv::Mat &im, const double &timestamp)
     }
 
     // Check mode change
+    // 检测模式变换：追踪+定位 或者 追踪+定位+建图
     {
+        // 地图上锁
         unique_lock<mutex> lock(mMutexMode);
+        // 跟踪+定位
         if(mbActivateLocalizationMode)
         {
+            // 停止建图
             mpLocalMapper->RequestStop();
 
             // Wait until Local Mapping has effectively stopped
+            // 等待建图线程停止
             while(!mpLocalMapper->isStopped())
             {
                 usleep(1000);
             }
-
+            // 仅跟踪
             mpTracker->InformOnlyTracking(true);
             mbActivateLocalizationMode = false;
         }
+        // 跟踪+建图+定位
         if(mbDeactivateLocalizationMode)
         {
             mpTracker->InformOnlyTracking(false);
@@ -254,6 +260,7 @@ cv::Mat System::TrackMonocular(const cv::Mat &im, const double &timestamp)
     }
 
     // Check reset
+    // 检查追踪tracking线程重启
     {
     unique_lock<mutex> lock(mMutexReset);
     if(mbReset)
@@ -263,6 +270,7 @@ cv::Mat System::TrackMonocular(const cv::Mat &im, const double &timestamp)
     }
     }
 
+    // 得到当前帧位姿
     cv::Mat Tcw = mpTracker->GrabImageMonocular(im,timestamp);
 
     unique_lock<mutex> lock2(mMutexState);

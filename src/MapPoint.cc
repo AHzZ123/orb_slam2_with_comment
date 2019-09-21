@@ -221,12 +221,14 @@ bool MapPoint::isBad()
     return mbBad;
 }
 
+// 在当前帧视野内则+1
 void MapPoint::IncreaseVisible(int n)
 {
     unique_lock<mutex> lock(mMutexFeatures);
     mnVisible+=n;
 }
 
+// 在当前帧匹配成功则+1
 void MapPoint::IncreaseFound(int n)
 {
     unique_lock<mutex> lock(mMutexFeatures);
@@ -236,14 +238,16 @@ void MapPoint::IncreaseFound(int n)
 float MapPoint::GetFoundRatio()
 {
     unique_lock<mutex> lock(mMutexFeatures);
+    // 跟踪（匹配上）到该地图点的普通帧帧数（IncreaseFound）< 应该观测到该地图点的普通帧数量（25%*IncreaseVisible）
     return static_cast<float>(mnFound)/mnVisible;
 }
 
 void MapPoint::ComputeDistinctiveDescriptors()
 {
     // Retrieve all observed descriptors
+    // 该地图点在观测帧中的所有描述子
     vector<cv::Mat> vDescriptors;
-
+    // 该地图点的所有观测帧
     map<KeyFrame*,size_t> observations;
 
     {
@@ -270,6 +274,7 @@ void MapPoint::ComputeDistinctiveDescriptors()
         return;
 
     // Compute distances between them
+    // 计算所有描述子之间的距离
     const size_t N = vDescriptors.size();
 
     float Distances[N][N];
@@ -285,6 +290,8 @@ void MapPoint::ComputeDistinctiveDescriptors()
     }
 
     // Take the descriptor with least median distance to the rest
+    // 计算每个描述子和其他描述子之间的距离，排序后得到其中值
+    // 将距离最小的作为该地图点的描述子
     int BestMedian = INT_MAX;
     int BestIdx = 0;
     for(size_t i=0;i<N;i++)
@@ -330,8 +337,10 @@ bool MapPoint::IsInKeyFrame(KeyFrame *pKF)
 void MapPoint::UpdateNormalAndDepth()
 {
     map<KeyFrame*,size_t> observations;
-    KeyFrame* pRefKF;
-    cv::Mat Pos;
+    // 参考关键帧
+    KeyFrame* pRefKF;   
+    // 三维坐标
+    cv::Mat Pos;       
     {
         unique_lock<mutex> lock1(mMutexFeatures);
         unique_lock<mutex> lock2(mMutexPos);
@@ -345,23 +354,31 @@ void MapPoint::UpdateNormalAndDepth()
     if(observations.empty())
         return;
 
-    cv::Mat normal = cv::Mat::zeros(3,1,CV_32F);
+    // 归一化观测向量之和
+    cv::Mat normal = cv::Mat::zeros(3,1,CV_32F);    
     int n=0;
     for(map<KeyFrame*,size_t>::iterator mit=observations.begin(), mend=observations.end(); mit!=mend; mit++)
     {
-        KeyFrame* pKF = mit->first;
+        // 观测关键帧
+        KeyFrame* pKF = mit->first; 
+        // 相机坐标中心
         cv::Mat Owi = pKF->GetCameraCenter();
-        cv::Mat normali = mWorldPos - Owi;
-        normal = normal + normali/cv::norm(normali);
+        // 计算观测向量
+        cv::Mat normali = mWorldPos - Owi;  
+        // 归一化
+        normal = normal + normali/cv::norm(normali);   
         n++;
     }
 
+    // 在参考帧坐标系下的三维点坐标
     cv::Mat PC = Pos - pRefKF->GetCameraCenter();
+    // 距离
     const float dist = cv::norm(PC);
+    // 图像金字塔下的尺度因子
     const int level = pRefKF->mvKeysUn[observations[pRefKF]].octave;
     const float levelScaleFactor =  pRefKF->mvScaleFactors[level];
     const int nLevels = pRefKF->mnScaleLevels;
-
+    // 计算地图点在观测距离范围
     {
         unique_lock<mutex> lock3(mMutexPos);
         mfMaxDistance = dist*levelScaleFactor;

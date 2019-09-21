@@ -41,6 +41,15 @@ Initializer::Initializer(const Frame &ReferenceFrame, float sigma, int iteration
     mMaxIterations = iterations;
 }
 
+/**
+* 开启初始化
+* @param CurrentFrame 当前帧
+* @param vMatches12 orbmatcher计算的初匹配
+* @param R21
+* @param t21
+* @param vP3D 其大小为vKeys1大小，表示三角化重投影成功的匹配点的3d点在相机1下的坐标
+* @param vbTriangulated  其大小为vKeys1大小，表示初始化成功后，特征点中三角化投影成功的情况
+*/
 bool Initializer::Initialize(const Frame &CurrentFrame, const vector<int> &vMatches12, cv::Mat &R21, cv::Mat &t21,
                              vector<cv::Point3f> &vP3D, vector<bool> &vbTriangulated)
 {
@@ -48,8 +57,10 @@ bool Initializer::Initialize(const Frame &CurrentFrame, const vector<int> &vMatc
     // Reference Frame: 1, Current Frame: 2
     mvKeys2 = CurrentFrame.mvKeysUn;
 
+    // mvMatches12储存着匹配点对在参考帧F1和当前帧F2中的序号
     mvMatches12.clear();
     mvMatches12.reserve(mvKeys2.size());
+    // 描述帧1中特征点匹配情况
     mvbMatched1.resize(mvKeys1.size());
     for(size_t i=0, iend=vMatches12.size();i<iend; i++)
     {
@@ -61,7 +72,7 @@ bool Initializer::Initialize(const Frame &CurrentFrame, const vector<int> &vMatc
         else
             mvbMatched1[i]=false;
     }
-
+    // 匹配点数
     const int N = mvMatches12.size();
 
     // Indices for minimum set selection
@@ -75,12 +86,14 @@ bool Initializer::Initialize(const Frame &CurrentFrame, const vector<int> &vMatc
     }
 
     // Generate sets of 8 points for each RANSAC iteration
+    // 用于FindHomography和FindFundamental求解
     mvSets = vector< vector<size_t> >(mMaxIterations,vector<size_t>(8,0));
 
-    DUtils::Random::SeedRandOnce(0);
-
+    DUtils::Random::SeedRandOnce(0);    // 随机种子
+    // 在所有匹配特征点对中随机选择8对匹配特征点为一组，共选择mMaxIterations组
     for(int it=0; it<mMaxIterations; it++)
     {
+        // 候选点对
         vAvailableIndices = vAllIndices;
 
         // Select a minimum set
@@ -88,30 +101,35 @@ bool Initializer::Initialize(const Frame &CurrentFrame, const vector<int> &vMatc
         {
             int randi = DUtils::Random::RandomInt(0,vAvailableIndices.size()-1);
             int idx = vAvailableIndices[randi];
-
+            // RANSAC集合加入候选点对
             mvSets[it][j] = idx;
-
+            // randi对应的索引已经被选过了，从容器中删除
+            // randi对应的索引用最后一个元素替换，并删掉最后一个元素
             vAvailableIndices[randi] = vAvailableIndices.back();
             vAvailableIndices.pop_back();
         }
     }
 
     // Launch threads to compute in parallel a fundamental matrix and a homography
-    vector<bool> vbMatchesInliersH, vbMatchesInliersF;
-    float SH, SF;
-    cv::Mat H, F;
-
+    // 启动两个线程分别计算fundamental matrix和homography
+    vector<bool> vbMatchesInliersH, vbMatchesInliersF;  // 内点标志
+    float SH, SF;   // 论文中提出的得分
+    cv::Mat H, F;   // RANSAC计算得到的单应矩阵H和基本矩阵F
+    
     thread threadH(&Initializer::FindHomography,this,ref(vbMatchesInliersH), ref(SH), ref(H));
     thread threadF(&Initializer::FindFundamental,this,ref(vbMatchesInliersF), ref(SF), ref(F));
 
     // Wait until both threads have finished
+    // 等待线程结束
     threadH.join();
     threadF.join();
 
     // Compute ratio of scores
+    // 计算启发式系数
     float RH = SH/(SH+SF);
 
     // Try to reconstruct from homography or fundamental depending on the ratio (0.40-0.45)
+    // 根据启发式系数选择初始化模型，即从H或者F中恢复R，t
     if(RH>0.40)
         return ReconstructH(vbMatchesInliersH,H,mK,R21,t21,vP3D,vbTriangulated,1.0,50);
     else //if(pF_HF>0.6)

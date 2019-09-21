@@ -97,7 +97,7 @@ protected:
 
     void ComputeThreeMaxima(std::vector<int>* histo, const int L, int &ind1, int &ind2, int &ind3);
 
-    float mfNNratio;    // 只有最小距离小于次小距离的mfNNratio倍才算匹配成功
+    float mfNNratio;    // 只有最优距离小于次优距离的mfNNratio倍才算匹配成功
     bool mbCheckOrientation;
 };
 
