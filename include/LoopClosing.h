@@ -122,7 +122,11 @@ protected:
     // Loop detector variables
     KeyFrame* mpCurrentKF;
     KeyFrame* mpMatchedKF;
+    // 始终被维护更新：
+    // 1)刚开始被拿来比较，看当前的候选关键帧是否保持有一致性．
+    // 2)最后被vCurrentConsistentGroups更新，保存新的连续性帧
     std::vector<ConsistentGroup> mvConsistentGroups;
+    // 存放一致性超过阈值的帧 当它不为空的时候　闭环就可以进入下一个阶段了　传递给compute sim3的下一个对象
     std::vector<KeyFrame*> mvpEnoughConsistentCandidates;
     std::vector<KeyFrame*> mvpCurrentConnectedKFs;
     std::vector<MapPoint*> mvpCurrentMatchedPoints;

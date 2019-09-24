@@ -139,6 +139,7 @@ void Sim3Solver::SetRansacParameters(double probability, int minInliers, int max
 
 cv::Mat Sim3Solver::iterate(int nIterations, bool &bNoMore, vector<bool> &vbInliers, int &nInliers)
 {
+    // 是否符合ransac的标准，也就是RANSAC是否成功
     bNoMore = false;
     vbInliers = vector<bool>(mN1,false);
     nInliers=0;
@@ -151,15 +152,18 @@ cv::Mat Sim3Solver::iterate(int nIterations, bool &bNoMore, vector<bool> &vbInli
 
     vector<size_t> vAvailableIndices;
 
+    // 随机抽取的3对点
     cv::Mat P3Dc1i(3,3,CV_32F);
     cv::Mat P3Dc2i(3,3,CV_32F);
 
     int nCurrentIterations = 0;
     while(mnIterations<mRansacMaxIts && nCurrentIterations<nIterations)
     {
+        // 这个函数中迭代的次数
         nCurrentIterations++;
+        // 总的迭代次数，默认为最大为300
         mnIterations++;
-
+        // 可用的下标
         vAvailableIndices = mvAllIndices;
 
         // Get min set of points
@@ -168,18 +172,25 @@ cv::Mat Sim3Solver::iterate(int nIterations, bool &bNoMore, vector<bool> &vbInli
             int randi = DUtils::Random::RandomInt(0, vAvailableIndices.size()-1);
 
             int idx = vAvailableIndices[randi];
-
+            // P3Dc1i和P3Dc2i中点的排列顺序：
+            // x1 x2 x3 ...
+            // y1 y2 y3 ...
+            // z1 z2 z3 ...
             mvX3Dc1[idx].copyTo(P3Dc1i.col(i));
             mvX3Dc2[idx].copyTo(P3Dc2i.col(i));
 
+            // 删除已经使用过的随机数序号
             vAvailableIndices[randi] = vAvailableIndices.back();
             vAvailableIndices.pop_back();
         }
 
+        // 计算两组匹配的sim3变换
         ComputeSim3(P3Dc1i,P3Dc2i);
 
+        // 通过投影误差进行内点检测
         CheckInliers();
 
+        // 更新最佳的Sim3变换
         if(mnInliersi>=mnBestInliers)
         {
             mvbBestInliers = mvbInliersi;
@@ -189,6 +200,7 @@ cv::Mat Sim3Solver::iterate(int nIterations, bool &bNoMore, vector<bool> &vbInli
             mBestTranslation = mt12i.clone();
             mBestScale = ms12i;
 
+            // 超过最小阈值，返回
             if(mnInliersi>mRansacMinInliers)
             {
                 nInliers = mnInliersi;
@@ -200,6 +212,7 @@ cv::Mat Sim3Solver::iterate(int nIterations, bool &bNoMore, vector<bool> &vbInli
         }
     }
 
+    // 总的迭代次数超过阈值mRansacMaxIts都还有没达到mnInliersi>mRansacMinInliers的要求，于是bNoMore=true
     if(mnIterations>=mRansacMaxIts)
         bNoMore=true;
 
@@ -225,6 +238,7 @@ void Sim3Solver::ComputeCentroid(cv::Mat &P, cv::Mat &Pr, cv::Mat &C)
 
 void Sim3Solver::ComputeSim3(cv::Mat &P1, cv::Mat &P2)
 {
+    // ！！！！！！！这段代码一定要看这篇论文！！！！！！！！！！！
     // Custom implementation of:
     // Horn 1987, Closed-form solution of absolute orientataion using unit quaternions
 

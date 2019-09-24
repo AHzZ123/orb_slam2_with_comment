@@ -67,6 +67,7 @@ protected:
     KeyFrame* mpKF1;
     KeyFrame* mpKF2;
 
+    // 匹配三维点序列
     std::vector<cv::Mat> mvX3Dc1;
     std::vector<cv::Mat> mvX3Dc2;
     std::vector<MapPoint*> mvpMapPoints1;
